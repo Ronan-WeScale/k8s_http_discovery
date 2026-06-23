@@ -87,18 +87,34 @@ func (c *ApisixRouteCollector) Collect(ctx context.Context) ([]Target, error) {
 					}
 				}
 
-				for _, host := range hosts {
-					for _, path := range paths {
+				probe := probePath(obj.GetAnnotations())
+				if probe != "" {
+					for _, host := range hosts {
 						targets = append(targets, Target{
-							URL: fmt.Sprintf("%s://%s%s", scheme, host, path),
+							URL: fmt.Sprintf("%s://%s%s", scheme, host, probe),
 							Labels: map[string]string{
 								"namespace":  namespace,
 								"route_name": name,
 								"route_kind": "ApisixRoute",
 								"host":       host,
-								"path":       path,
+								"path":       probe,
 							},
 						})
+					}
+				} else {
+					for _, host := range hosts {
+						for _, path := range paths {
+							targets = append(targets, Target{
+								URL: fmt.Sprintf("%s://%s%s", scheme, host, path),
+								Labels: map[string]string{
+									"namespace":  namespace,
+									"route_name": name,
+									"route_kind": "ApisixRoute",
+									"host":       host,
+									"path":       path,
+								},
+							})
+						}
 					}
 				}
 			}

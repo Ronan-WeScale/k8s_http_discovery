@@ -14,7 +14,7 @@ import (
 
 // newApisixRoute builds an unstructured ApisixRoute for testing.
 // httpRules is a slice of (hosts, paths) pairs representing spec.http entries.
-func newApisixRoute(namespace, name string, httpRules []apisixHTTPRule) *unstructured.Unstructured {
+func newApisixRoute(namespace, name string, httpRules []apisixHTTPRule, annotations map[string]string) *unstructured.Unstructured {
 	rules := make([]interface{}, len(httpRules))
 	for i, r := range httpRules {
 		hosts := make([]interface{}, len(r.hosts))
@@ -33,7 +33,7 @@ func newApisixRoute(namespace, name string, httpRules []apisixHTTPRule) *unstruc
 		}
 	}
 
-	return &unstructured.Unstructured{
+	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "apisix.apache.org/v2",
 			"kind":       "ApisixRoute",
@@ -46,6 +46,10 @@ func newApisixRoute(namespace, name string, httpRules []apisixHTTPRule) *unstruc
 			},
 		},
 	}
+	if len(annotations) > 0 {
+		obj.SetAnnotations(annotations)
+	}
+	return obj
 }
 
 type apisixHTTPRule struct {
@@ -81,7 +85,7 @@ func TestApisixRouteCollector_Collect(t *testing.T) {
 			routes: []*unstructured.Unstructured{
 				newApisixRoute("default", "api-route", []apisixHTTPRule{
 					{hosts: []string{"example.com"}, paths: []string{"/api/*"}},
-				}),
+				}, nil),
 			},
 			wantURLs: []string{"https://example.com/api/"},
 			wantLen:  1,
@@ -91,7 +95,7 @@ func TestApisixRouteCollector_Collect(t *testing.T) {
 			routes: []*unstructured.Unstructured{
 				newApisixRoute("default", "root-route", []apisixHTTPRule{
 					{hosts: []string{"example.com"}, paths: []string{"/*"}},
-				}),
+				}, nil),
 			},
 			wantURLs: []string{"https://example.com/"},
 			wantLen:  1,
@@ -101,7 +105,7 @@ func TestApisixRouteCollector_Collect(t *testing.T) {
 			routes: []*unstructured.Unstructured{
 				newApisixRoute("default", "exact-route", []apisixHTTPRule{
 					{hosts: []string{"example.com"}, paths: []string{"/exact"}},
-				}),
+				}, nil),
 			},
 			wantURLs: []string{"https://example.com/exact"},
 			wantLen:  1,
@@ -114,7 +118,7 @@ func TestApisixRouteCollector_Collect(t *testing.T) {
 						hosts: []string{"a.example.com", "b.example.com"},
 						paths: []string{"/api/*", "/health"},
 					},
-				}),
+				}, nil),
 			},
 			wantURLs: []string{
 				"https://a.example.com/api/",
@@ -130,7 +134,7 @@ func TestApisixRouteCollector_Collect(t *testing.T) {
 				newApisixRoute("default", "two-rules", []apisixHTTPRule{
 					{hosts: []string{"a.example.com"}, paths: []string{"/api/*"}},
 					{hosts: []string{"b.example.com"}, paths: []string{"/other"}},
-				}),
+				}, nil),
 			},
 			wantURLs: []string{
 				"https://a.example.com/api/",
@@ -142,6 +146,19 @@ func TestApisixRouteCollector_Collect(t *testing.T) {
 			name:    "no routes produces empty result",
 			routes:  nil,
 			wantLen: 0,
+		},
+		{
+			name: "probe-path annotation overrides all rule paths",
+			routes: []*unstructured.Unstructured{
+				newApisixRoute("default", "my-route", []apisixHTTPRule{
+					{
+						hosts: []string{"x.com"},
+						paths: []string{"/api/*", "/v2/*"},
+					},
+				}, map[string]string{"k8s-http-discovery.io/probe-path": "/ping"}),
+			},
+			wantURLs: []string{"https://x.com/ping"},
+			wantLen:  1,
 		},
 	}
 

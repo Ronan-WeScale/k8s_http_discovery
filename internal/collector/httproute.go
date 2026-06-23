@@ -97,18 +97,34 @@ func (c *HTTPRouteCollector) Collect(ctx context.Context) ([]Target, error) {
 			}
 
 			scheme := c.config.DefaultScheme
-			for _, host := range hostnames {
-				for _, path := range paths {
+			probe := probePath(obj.GetAnnotations())
+			if probe != "" {
+				for _, host := range hostnames {
 					targets = append(targets, Target{
-						URL: fmt.Sprintf("%s://%s%s", scheme, host, path),
+						URL: fmt.Sprintf("%s://%s%s", scheme, host, probe),
 						Labels: map[string]string{
 							"namespace":  namespace,
 							"route_name": name,
 							"route_kind": "HTTPRoute",
 							"host":       host,
-							"path":       path,
+							"path":       probe,
 						},
 					})
+				}
+			} else {
+				for _, host := range hostnames {
+					for _, path := range paths {
+						targets = append(targets, Target{
+							URL: fmt.Sprintf("%s://%s%s", scheme, host, path),
+							Labels: map[string]string{
+								"namespace":  namespace,
+								"route_name": name,
+								"route_kind": "HTTPRoute",
+								"host":       host,
+								"path":       path,
+							},
+						})
+					}
 				}
 			}
 		}

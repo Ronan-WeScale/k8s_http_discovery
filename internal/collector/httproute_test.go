@@ -13,7 +13,7 @@ import (
 )
 
 // newHTTPRoute builds an unstructured HTTPRoute for testing.
-func newHTTPRoute(namespace, name string, hostnames []string, pathValues []string) *unstructured.Unstructured {
+func newHTTPRoute(namespace, name string, hostnames []string, pathValues []string, annotations map[string]string) *unstructured.Unstructured {
 	var matches []interface{}
 	for _, pv := range pathValues {
 		matches = append(matches, map[string]interface{}{
@@ -44,17 +44,30 @@ func newHTTPRoute(namespace, name string, hostnames []string, pathValues []strin
 		spec["rules"] = rules
 	}
 
-	return &unstructured.Unstructured{
+	metadata := map[string]interface{}{
+		"name":      name,
+		"namespace": namespace,
+	}
+	if len(annotations) > 0 {
+		ann := make(map[string]interface{}, len(annotations))
+		for k, v := range annotations {
+			ann[k] = v
+		}
+		metadata["annotations"] = ann
+	}
+
+	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "gateway.networking.k8s.io/v1",
 			"kind":       "HTTPRoute",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-			},
-			"spec": spec,
+			"metadata":   metadata,
+			"spec":       spec,
 		},
 	}
+	if len(annotations) > 0 {
+		obj.SetAnnotations(annotations)
+	}
+	return obj
 }
 
 // httprouteScheme builds a runtime.Scheme that registers HTTPRoute list kind.
@@ -87,6 +100,7 @@ func TestHTTPRouteCollector_Collect(t *testing.T) {
 				newHTTPRoute("default", "my-route",
 					[]string{"a.example.com", "b.example.com"},
 					[]string{"/api", "/health"},
+					nil,
 				),
 			},
 			wantURLs: []string{
@@ -103,6 +117,7 @@ func TestHTTPRouteCollector_Collect(t *testing.T) {
 				newHTTPRoute("default", "no-path-route",
 					[]string{"example.com"},
 					nil, // no path values
+					nil,
 				),
 			},
 			wantURLs: []string{"https://example.com/"},
@@ -114,6 +129,7 @@ func TestHTTPRouteCollector_Collect(t *testing.T) {
 				newHTTPRoute("mynamespace", "myroute",
 					[]string{"host.example.com"},
 					[]string{"/path"},
+					nil,
 				),
 			},
 			wantURLs: []string{"https://host.example.com/path"},
@@ -123,6 +139,18 @@ func TestHTTPRouteCollector_Collect(t *testing.T) {
 			name:    "no routes produces empty targets",
 			routes:  nil,
 			wantLen: 0,
+		},
+		{
+			name: "probe-path annotation overrides host×path fan-out",
+			routes: []*unstructured.Unstructured{
+				newHTTPRoute("default", "my-route",
+					[]string{"a.example.com", "b.example.com"},
+					[]string{"/api"},
+					map[string]string{"k8s-http-discovery.io/probe-path": "/health"},
+				),
+			},
+			wantURLs: []string{"https://a.example.com/health", "https://b.example.com/health"},
+			wantLen:  2,
 		},
 	}
 
@@ -193,7 +221,7 @@ func TestHTTPRouteCollector_Collect(t *testing.T) {
 func TestHTTPRouteCollector_LabelValues(t *testing.T) {
 	t.Parallel()
 
-	route := newHTTPRoute("mynamespace", "myroute", []string{"host.example.com"}, []string{"/path"})
+	route := newHTTPRoute("mynamespace", "myroute", []string{"host.example.com"}, []string{"/path"}, nil)
 	scheme := httprouteScheme()
 	dynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme,
 		map[schema.GroupVersionResource]string{httprouteGVR: "HTTPRouteList"},

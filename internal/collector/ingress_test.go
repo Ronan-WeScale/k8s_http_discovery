@@ -175,6 +175,37 @@ func TestIngressCollector_Collect(t *testing.T) {
 			wantLen:  1,
 		},
 		{
+			name: "probe-path annotation replaces all route paths with single target per host",
+			ingresses: []networkingv1.Ingress{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "annotated-ingress",
+						Namespace: "default",
+						Annotations: map[string]string{
+							"k8s-http-discovery.io/probe-path": "/healthz",
+						},
+					},
+					Spec: networkingv1.IngressSpec{
+						Rules: []networkingv1.IngressRule{
+							{
+								Host: "example.com",
+								IngressRuleValue: networkingv1.IngressRuleValue{
+									HTTP: &networkingv1.HTTPIngressRuleValue{
+										Paths: []networkingv1.HTTPIngressPath{
+											{Path: "/api/v1"},
+											{Path: "/api/v2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantURLs: []string{"http://example.com/healthz"},
+			wantLen:  1,
+		},
+		{
 			name:       "empty namespace list collects all namespaces",
 			namespaces: []string{},
 			ingresses: []networkingv1.Ingress{

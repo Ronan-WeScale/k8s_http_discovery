@@ -50,13 +50,14 @@ func (c *IngressCollector) Collect(ctx context.Context) ([]Target, error) {
 
 // targetsFromIngress converts a single Ingress to a slice of Targets.
 func targetsFromIngress(ing *networkingv1.Ingress) []Target {
-	// Build a set of TLS-covered hosts for O(1) lookup.
 	tlsHosts := make(map[string]bool)
 	for _, tls := range ing.Spec.TLS {
 		for _, h := range tls.Hosts {
 			tlsHosts[h] = true
 		}
 	}
+
+	probe := probePath(ing.Annotations)
 
 	var targets []Target
 	for _, rule := range ing.Spec.Rules {
@@ -68,8 +69,21 @@ func targetsFromIngress(ing *networkingv1.Ingress) []Target {
 			scheme = "https"
 		}
 
+		if probe != "" {
+			targets = append(targets, Target{
+				URL: fmt.Sprintf("%s://%s%s", scheme, rule.Host, probe),
+				Labels: map[string]string{
+					"namespace":  ing.Namespace,
+					"route_name": ing.Name,
+					"route_kind": "Ingress",
+					"host":       rule.Host,
+					"path":       probe,
+				},
+			})
+			continue
+		}
+
 		if rule.HTTP == nil {
-			// Rule with no HTTP paths — emit a single root target.
 			targets = append(targets, Target{
 				URL: fmt.Sprintf("%s://%s/", scheme, rule.Host),
 				Labels: map[string]string{
