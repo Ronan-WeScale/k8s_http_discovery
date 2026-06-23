@@ -52,6 +52,8 @@ func main() {
 			collectors = append(collectors, collector.NewHTTPRouteCollector(dynClient, cfg))
 		case "apisixroute":
 			collectors = append(collectors, collector.NewApisixRouteCollector(dynClient, cfg))
+		case "openshiftroute":
+			collectors = append(collectors, collector.NewOpenShiftRouteCollector(dynClient, cfg))
 		default:
 			log.Printf("unknown collector %q — skipping", name)
 		}
