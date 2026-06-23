@@ -58,50 +58,68 @@ func (c *ApisixRouteCollector) Collect(ctx context.Context) ([]Target, error) {
 
 			httpRules, _ := spec["http"].([]interface{})
 			scheme := c.config.DefaultScheme
+			probe := probePath(obj.GetAnnotations())
 
-			for _, r := range httpRules {
-				rule, _ := r.(map[string]interface{})
-				if rule == nil {
-					continue
-				}
-				match, _ := rule["match"].(map[string]interface{})
-				if match == nil {
-					continue
-				}
-
-				var hosts []string
-				if hs, ok := match["hosts"].([]interface{}); ok {
-					for _, h := range hs {
-						if s, ok := h.(string); ok && s != "" {
-							hosts = append(hosts, s)
+			if probe != "" {
+				// Collect all unique hosts across all rules
+				seen := make(map[string]bool)
+				for _, r := range httpRules {
+					rule, _ := r.(map[string]interface{})
+					if rule == nil {
+						continue
+					}
+					match, _ := rule["match"].(map[string]interface{})
+					if match == nil {
+						continue
+					}
+					if hs, ok := match["hosts"].([]interface{}); ok {
+						for _, h := range hs {
+							if s, ok := h.(string); ok && s != "" && !seen[s] {
+								seen[s] = true
+								targets = append(targets, Target{
+									URL: fmt.Sprintf("%s://%s%s", scheme, s, probe),
+									Labels: map[string]string{
+										"namespace":  namespace,
+										"route_name": name,
+										"route_kind": "ApisixRoute",
+										"host":       s,
+										"path":       probe,
+									},
+								})
+							}
 						}
 					}
 				}
+			} else {
+				// Original per-rule fan-out
+				for _, r := range httpRules {
+					rule, _ := r.(map[string]interface{})
+					if rule == nil {
+						continue
+					}
+					match, _ := rule["match"].(map[string]interface{})
+					if match == nil {
+						continue
+					}
 
-				var paths []string
-				if ps, ok := match["paths"].([]interface{}); ok {
-					for _, p := range ps {
-						if s, ok := p.(string); ok {
-							paths = append(paths, cleanApisixPath(s))
+					var hosts []string
+					if hs, ok := match["hosts"].([]interface{}); ok {
+						for _, h := range hs {
+							if s, ok := h.(string); ok && s != "" {
+								hosts = append(hosts, s)
+							}
 						}
 					}
-				}
 
-				probe := probePath(obj.GetAnnotations())
-				if probe != "" {
-					for _, host := range hosts {
-						targets = append(targets, Target{
-							URL: fmt.Sprintf("%s://%s%s", scheme, host, probe),
-							Labels: map[string]string{
-								"namespace":  namespace,
-								"route_name": name,
-								"route_kind": "ApisixRoute",
-								"host":       host,
-								"path":       probe,
-							},
-						})
+					var paths []string
+					if ps, ok := match["paths"].([]interface{}); ok {
+						for _, p := range ps {
+							if s, ok := p.(string); ok {
+								paths = append(paths, cleanApisixPath(s))
+							}
+						}
 					}
-				} else {
+
 					for _, host := range hosts {
 						for _, path := range paths {
 							targets = append(targets, Target{

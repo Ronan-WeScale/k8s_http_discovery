@@ -160,6 +160,23 @@ func TestApisixRouteCollector_Collect(t *testing.T) {
 			wantURLs: []string{"https://x.com/ping"},
 			wantLen:  1,
 		},
+		{
+			name: "probe-path with multiple rules sharing same host emits one target per unique host",
+			routes: []*unstructured.Unstructured{
+				newApisixRoute("default", "multi-rule", []apisixHTTPRule{
+					{
+						hosts: []string{"x.com"},
+						paths: []string{"/api/*"},
+					},
+					{
+						hosts: []string{"x.com"},
+						paths: []string{"/v2/*"},
+					},
+				}, map[string]string{"k8s-http-discovery.io/probe-path": "/ping"}),
+			},
+			wantURLs: []string{"https://x.com/ping"},
+			wantLen:  1,
+		},
 	}
 
 	for _, tc := range tests {
