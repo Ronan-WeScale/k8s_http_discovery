@@ -18,18 +18,14 @@ func newOpenShiftRoute(namespace, name string, spec map[string]interface{}, anno
 			"apiVersion": "route.openshift.io/v1",
 			"kind":       "Route",
 			"metadata": map[string]interface{}{
-				"name":        name,
-				"namespace":   namespace,
-				"annotations": func() map[string]interface{} {
-					out := make(map[string]interface{})
-					for k, v := range annotations {
-						out[k] = v
-					}
-					return out
-				}(),
+				"name":      name,
+				"namespace": namespace,
 			},
 			"spec": spec,
 		},
+	}
+	if len(annotations) > 0 {
+		obj.SetAnnotations(annotations)
 	}
 	return obj
 }

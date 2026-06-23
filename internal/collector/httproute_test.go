@@ -48,13 +48,6 @@ func newHTTPRoute(namespace, name string, hostnames []string, pathValues []strin
 		"name":      name,
 		"namespace": namespace,
 	}
-	if len(annotations) > 0 {
-		ann := make(map[string]interface{}, len(annotations))
-		for k, v := range annotations {
-			ann[k] = v
-		}
-		metadata["annotations"] = ann
-	}
 
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
