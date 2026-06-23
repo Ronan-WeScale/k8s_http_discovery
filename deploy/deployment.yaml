@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-http-discovery
+  namespace: monitoring
+  labels:
+    app: k8s-http-discovery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: k8s-http-discovery
+  template:
+    metadata:
+      labels:
+        app: k8s-http-discovery
+    spec:
+      serviceAccountName: k8s-http-discovery
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+      - name: k8s-http-discovery
+        image: ghcr.io/ronan-wescale/k8s-http-discovery:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8080"
+        - name: NAMESPACES
+          value: ""
+        - name: COLLECTORS
+          value: "ingress,httproute,apisixroute"
+        - name: DEFAULT_SCHEME
+          value: "http"
+        - name: CACHE_TTL
+          value: "30s"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
