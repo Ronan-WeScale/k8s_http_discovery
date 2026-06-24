@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "k8s-http-discovery.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "k8s-http-discovery.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "k8s-http-discovery.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "k8s-http-discovery.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "k8s-http-discovery.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.config.port | int }}
+          protocol: TCP
+        env:
+        - name: PORT
+          value: {{ .Values.config.port | quote }}
+        - name: NAMESPACES
+          value: {{ .Values.config.namespaces | quote }}
+        - name: COLLECTORS
+          value: {{ .Values.config.collectors | quote }}
+        - name: DEFAULT_SCHEME
+          value: {{ .Values.config.defaultScheme | quote }}
+        - name: CACHE_TTL
+          value: {{ .Values.config.cacheTTL | quote }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
