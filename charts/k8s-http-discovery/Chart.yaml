@@ -10,6 +10,6 @@ keywords:
   - kubernetes
   - blackbox-exporter
 sources:
-  - https://github.com/Ronan-WeScale/k8s_http_discovery
+  - https://github.com/Ronan-WeScale/k8s-http-discovery
 maintainers:
   - name: Ronan-WeScale
