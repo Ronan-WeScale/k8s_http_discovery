@@ -21,10 +21,11 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - uses: helm/setup-helm@v4
+      - uses: azure/setup-helm@v4
 
       - uses: helm/chart-releaser-action@v1.6.0
         with:
           charts_dir: charts
+          skip_existing: true
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
